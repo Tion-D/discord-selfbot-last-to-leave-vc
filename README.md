@@ -48,8 +48,8 @@ The bot is designed to run continuously and reconnect automatically if the conne
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/yourusername/discord-vc-controller.git
-   cd discord-vc-controller
+   git clone https://github.com/Tion-D/Discord-SelfBot-Join-Leave-VC.git
+   cd Discord-SelfBot-Join-Leave-VC
    ```
 
 2. **Install dependencies using pip and the provided `requirements.txt`:**
