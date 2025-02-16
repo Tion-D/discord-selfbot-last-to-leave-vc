@@ -42,7 +42,7 @@ The bot is designed to run continuously and reconnect automatically if the conne
 - [certifi](https://pypi.org/project/certifi/)
 - [colorama](https://pypi.org/project/colorama/)
 - [Flask](https://pypi.org/project/Flask/)
-
+```
 ## Installation
 
 1. **Clone the repository:**
