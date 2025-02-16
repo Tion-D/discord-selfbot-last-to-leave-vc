@@ -60,35 +60,21 @@ The bot is designed to run continuously and reconnect automatically if the conne
 
 ## Usage
 
-1. **Set Up Environment Variables (Optional):**
-
-   You can optionally set a default token using an environment variable.  
-   For example, in your shell:
-
-   ```bash
-   export DISCORD_TOKEN=your_default_discord_token
-   ```
-
-2. **Run the Bot:**
-
+1. **Run the Bot:**
+  - Put your discord token in env, set your environment variable to DISCORD_TOKEN
    ```bash
    python bot.py
    ```
 
-   The bot will:
-   - Connect to Discord’s Gateway.
-   - Start a Flask web server (listening on the port defined by the `PORT` environment variable or defaulting to `3000`).
-
-3. **Control via Web Interface:**
+2. **Control via Web Interface:**
 
    - Open your browser and navigate to the server URL (e.g., `http://localhost:3000`).
-   - Enter the **Guild ID**, **Voice Channel ID**, and **Discord Token** (if you need to update it).
+   - Enter the **Guild ID**, and **Voice Channel ID**.
    - Click **Join VC** to have the bot join the voice channel or **Leave VC** to disconnect.
 
 ## Deployment
 
 This project is suitable for deployment on platforms like **Railway**, **Render**, or **Heroku**.  
-> **Note:** If deploying as a web service, ensure the platform provides a valid `PORT` environment variable or configure the start command accordingly.
 
 ### Example Start Command:
 ```bash
