@@ -1,0 +1,5 @@
+websockets
+httpx
+colorama
+certifi
+flask
