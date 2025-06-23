@@ -64,7 +64,7 @@ def action():
         future.result(timeout=5)
 
         if action_type == "join" and afk_channel_id:
-            headers = {"Authorization": f"Bot {CURRENT_TOKEN}", "Content-Type": "application/json"}
+            headers = {"Authorization": CURRENT_TOKEN, "Content-Type": "application/json"}
             msg_url = f"https://discord.com/api/v10/channels/{afk_channel_id}/messages?limit=1"
             resp = requests.get(msg_url, headers=headers)
             if resp.ok and isinstance(resp.json(), list) and resp.json():
@@ -84,9 +84,9 @@ def action():
 
 discord_ws = None
 bot_loop = None
-CURRENT_TOKEN = os.environ.get("DISCORD_TOKEN", None)
-if not CURRENT_TOKEN or CURRENT_TOKEN == "YOUR_DISCORD_TOKEN":
-    print("Error: DISCORD_TOKEN environment variable not set or invalid. Exiting.")
+CURRENT_TOKEN = os.environ.get("DISCORD_TOKEN")
+if not CURRENT_TOKEN:
+    print("Error: DISCORD_TOKEN environment variable not set. Exiting.")
     exit(1)
 
 GATEWAY_URL = "wss://gateway.discord.gg/?v=10&encoding=json"
