@@ -3,3 +3,4 @@ httpx
 colorama
 certifi
 flask
+requests
