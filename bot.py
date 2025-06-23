@@ -102,7 +102,7 @@ async def connect_to_gateway():
                 identify_payload = {
                     "op": 2,
                     "d": {
-                        "token": CURRENT_TOKEN,
+                        "token": f"Bot {CURRENT_TOKEN}",
                         "intents": 513,
                         "properties": {
                             "$os": "windows",
