@@ -82,12 +82,12 @@ def action():
     except Exception as e:
         return f"Error sending command: {e}"
 
-
-# ------------ Gateway Connection & Bot Loop ------------
-
 discord_ws = None
 bot_loop = None
-CURRENT_TOKEN = os.environ.get("TOKEN", "YOUR_DISCORD_TOKEN")
+CURRENT_TOKEN = os.environ.get("DISCORD_TOKEN", None)
+if not CURRENT_TOKEN or CURRENT_TOKEN == "YOUR_DISCORD_TOKEN":
+    print("Error: DISCORD_TOKEN environment variable not set or invalid. Exiting.")
+    exit(1)
 
 GATEWAY_URL = "wss://gateway.discord.gg/?v=10&encoding=json"
 
@@ -126,7 +126,6 @@ async def connect_to_gateway():
 
                 while True:
                     message = await ws.recv()
-                    # handle other events if needed
         except websockets.ConnectionClosed as cc:
             print(f"Gateway connection closed: {cc}. Reconnecting in 5s...")
             await asyncio.sleep(5)
