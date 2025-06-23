@@ -11,6 +11,8 @@ from flask import Flask, request, render_template_string
 
 app = Flask(__name__)
 
+afk_channel_id_global = None
+
 index_html = """
 <!doctype html>
 <html>
@@ -42,12 +44,14 @@ def home():
 
 @app.route("/action", methods=["POST"])
 def action():
-    global discord_ws, bot_loop
+    global discord_ws, bot_loop, afk_channel_id_global
 
     guild_id = request.form.get("guild_id")
     voice_channel_id = request.form.get("voice_channel_id")
     afk_channel_id = request.form.get("afk_channel_id")
     action_type = request.form.get("action")
+
+    afk_channel_id_global = afk_channel_id or None
 
     if action_type == "join":
         payload = {"op": 4, "d": {"guild_id": guild_id, "channel_id": voice_channel_id, "self_mute": False, "self_deaf": False}}
@@ -62,23 +66,7 @@ def action():
     try:
         future = asyncio.run_coroutine_threadsafe(discord_ws.send(json.dumps(payload)), bot_loop)
         future.result(timeout=5)
-
-        if action_type == "join" and afk_channel_id:
-            headers = {"Authorization": CURRENT_TOKEN, "Content-Type": "application/json"}
-            msg_url = f"https://discord.com/api/v10/channels/{afk_channel_id}/messages?limit=1"
-            resp = requests.get(msg_url, headers=headers)
-            if resp.ok and isinstance(resp.json(), list) and resp.json():
-                last_msg = resp.json()[0]
-                message_id = last_msg.get("id")
-                emoji = "%E2%9C%85"
-                react_url = f"https://discord.com/api/v10/channels/{afk_channel_id}/messages/{message_id}/reactions/{emoji}/@me"
-                react = requests.put(react_url, headers=headers)
-                if not react.ok:
-                    return f"Joined VC, but failed to react: {react.status_code} {react.text}"
-            else:
-                return f"Joined VC, but failed to fetch AFK messages: {resp.status_code} {resp.text}"
-
-        return f"Action '{action_type}' executed."
+        return f"Action '{action_type}' executed. AFK-check listening {'enabled' if afk_channel_id_global else 'disabled'}."
     except Exception as e:
         return f"Error sending command: {e}"
 
@@ -92,7 +80,7 @@ if not CURRENT_TOKEN:
 GATEWAY_URL = "wss://gateway.discord.gg/?v=10&encoding=json"
 
 async def connect_to_gateway():
-    global discord_ws
+    global discord_ws, afk_channel_id_global
     ssl_context = ssl.create_default_context(cafile=certifi.where())
 
     while True:
@@ -111,7 +99,7 @@ async def connect_to_gateway():
                         "intents": 513,
                         "properties": {"$os": "windows", "$browser": "chrome", "$device": "pc"},
                         "presence": {"status": "online", "since": None, "activities": [], "afk": False},
-                        "compress": False,
+                        "compress": False
                     }
                 }
                 await ws.send(json.dumps(identify_payload))
@@ -121,13 +109,20 @@ async def connect_to_gateway():
                     while True:
                         await asyncio.sleep(heartbeat_interval / 1000)
                         await ws.send(json.dumps({"op": 1, "d": None}))
-                        print("[GATEWAY] Heartbeat sent.")
                 asyncio.create_task(heartbeat())
 
                 while True:
-                    message = await ws.recv()
+                    msg = await ws.recv()
+                    data = json.loads(msg)
+                    if data.get("t") == "MESSAGE_CREATE" and afk_channel_id_global:
+                        d = data.get("d", {})
+                        if d.get("channel_id") == afk_channel_id_global and "✅" in d.get("content", ""):
+                            message_id = d.get("id")
+                            emoji = "%E2%9C%85"
+                            url = f"https://discord.com/api/v10/channels/{afk_channel_id_global}/messages/{message_id}/reactions/{emoji}/@me"
+                            requests.put(url, headers={"Authorization": CURRENT_TOKEN, "Content-Type": "application/json"})
         except websockets.ConnectionClosed as cc:
-            print(f"Gateway connection closed: {cc}. Reconnecting in 5s...")
+            print(f"Gateway closed: {cc}. Reconnecting in 5s...")
             await asyncio.sleep(5)
         except Exception as e:
             print(f"Unexpected error: {e}. Reconnecting in 5s...")
