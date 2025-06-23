@@ -4,6 +4,7 @@ import asyncio
 import json
 import ssl
 import certifi
+import requests
 
 import websockets
 from flask import Flask, request, render_template_string
@@ -25,6 +26,9 @@ index_html = """
     <label for="voice_channel_id">Voice Channel ID:</label><br>
     <input type="text" id="voice_channel_id" name="voice_channel_id" placeholder="Enter Voice Channel ID"><br><br>
 
+    <label for="afk_channel_id">AFK Check Channel ID (optional):</label><br>
+    <input type="text" id="afk_channel_id" name="afk_channel_id" placeholder="Enter AFK Check Channel ID"><br><br>
+
     <button type="submit" name="action" value="join">Join VC</button>
     <button type="submit" name="action" value="leave">Leave VC</button>
   </form>
@@ -42,28 +46,13 @@ def action():
 
     guild_id = request.form.get("guild_id")
     voice_channel_id = request.form.get("voice_channel_id")
+    afk_channel_id = request.form.get("afk_channel_id")
     action_type = request.form.get("action")
 
     if action_type == "join":
-        payload = {
-            "op": 4,
-            "d": {
-                "guild_id": guild_id,
-                "channel_id": voice_channel_id,
-                "self_mute": False,
-                "self_deaf": False
-            }
-        }
+        payload = {"op": 4, "d": {"guild_id": guild_id, "channel_id": voice_channel_id, "self_mute": False, "self_deaf": False}}
     elif action_type == "leave":
-        payload = {
-            "op": 4,
-            "d": {
-                "guild_id": guild_id,
-                "channel_id": None,
-                "self_mute": False,
-                "self_deaf": False
-            }
-        }
+        payload = {"op": 4, "d": {"guild_id": guild_id, "channel_id": None, "self_mute": False, "self_deaf": False}}
     else:
         return "Invalid action."
 
@@ -71,18 +60,34 @@ def action():
         return "Discord bot is not connected yet."
 
     try:
-        future = asyncio.run_coroutine_threadsafe(
-            discord_ws.send(json.dumps(payload)), bot_loop
-        )
+        future = asyncio.run_coroutine_threadsafe(discord_ws.send(json.dumps(payload)), bot_loop)
         future.result(timeout=5)
+
+        if action_type == "join" and afk_channel_id:
+            headers = {"Authorization": f"Bot {CURRENT_TOKEN}", "Content-Type": "application/json"}
+            msg_url = f"https://discord.com/api/v10/channels/{afk_channel_id}/messages?limit=1"
+            resp = requests.get(msg_url, headers=headers)
+            if resp.ok and isinstance(resp.json(), list) and resp.json():
+                last_msg = resp.json()[0]
+                message_id = last_msg.get("id")
+                emoji = "%E2%9C%85"
+                react_url = f"https://discord.com/api/v10/channels/{afk_channel_id}/messages/{message_id}/reactions/{emoji}/@me"
+                react = requests.put(react_url, headers=headers)
+                if not react.ok:
+                    return f"Joined VC, but failed to react: {react.status_code} {react.text}"
+            else:
+                return f"Joined VC, but failed to fetch AFK messages: {resp.status_code} {resp.text}"
+
         return f"Action '{action_type}' executed."
     except Exception as e:
         return f"Error sending command: {e}"
 
 
+# ------------ Gateway Connection & Bot Loop ------------
+
 discord_ws = None
 bot_loop = None
-CURRENT_TOKEN = os.environ.get("DISCORD_TOKEN", "YOUR_DISCORD_TOKEN")
+CURRENT_TOKEN = os.environ.get("TOKEN", "YOUR_DISCORD_TOKEN")
 
 GATEWAY_URL = "wss://gateway.discord.gg/?v=10&encoding=json"
 
@@ -102,27 +107,16 @@ async def connect_to_gateway():
                 identify_payload = {
                     "op": 2,
                     "d": {
-                        "token": f"Bot {CURRENT_TOKEN}",
+                        "token": CURRENT_TOKEN,
                         "intents": 513,
-                        "properties": {
-                            "$os": "windows",
-                            "$browser": "chrome",
-                            "$device": "pc"
-                        },
-                        "presence": {
-                            "status": "online",
-                            "since": None,
-                            "activities": [],
-                            "afk": False
-                        },
+                        "properties": {"$os": "windows", "$browser": "chrome", "$device": "pc"},
+                        "presence": {"status": "online", "since": None, "activities": [], "afk": False},
                         "compress": False,
                     }
                 }
                 await ws.send(json.dumps(identify_payload))
                 print("[GATEWAY] Sent Identify payload.")
 
-
-                # Heartbeat task.
                 async def heartbeat():
                     while True:
                         await asyncio.sleep(heartbeat_interval / 1000)
@@ -132,8 +126,7 @@ async def connect_to_gateway():
 
                 while True:
                     message = await ws.recv()
-                    data = json.loads(message)
-                    #print(f"[GATEWAY] Event: {data}")
+                    # handle other events if needed
         except websockets.ConnectionClosed as cc:
             print(f"Gateway connection closed: {cc}. Reconnecting in 5s...")
             await asyncio.sleep(5)
@@ -141,8 +134,8 @@ async def connect_to_gateway():
             print(f"Unexpected error: {e}. Reconnecting in 5s...")
             await asyncio.sleep(5)
 
-def run_bot():
 
+def run_bot():
     global bot_loop
     bot_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(bot_loop)
