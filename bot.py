@@ -70,6 +70,7 @@ def action():
     except Exception as e:
         return f"Error sending command: {e}"
 
+
 discord_ws = None
 bot_loop = None
 CURRENT_TOKEN = os.environ.get("DISCORD_TOKEN")
@@ -114,10 +115,10 @@ async def connect_to_gateway():
                 while True:
                     msg = await ws.recv()
                     data = json.loads(msg)
-                    if data.get("t") == "MESSAGE_CREATE" and afk_channel_id_global:
+                    if data.get("t") == "MESSAGE_REACTION_ADD" and afk_channel_id_global:
                         d = data.get("d", {})
-                        if d.get("channel_id") == afk_channel_id_global and "✅" in d.get("content", ""):
-                            message_id = d.get("id")
+                        if d.get("channel_id") == afk_channel_id_global and d.get("emoji", {}).get("name") == "✅":
+                            message_id = d.get("message_id")
                             emoji = "%E2%9C%85"
                             url = f"https://discord.com/api/v10/channels/{afk_channel_id_global}/messages/{message_id}/reactions/{emoji}/@me"
                             requests.put(url, headers={"Authorization": CURRENT_TOKEN, "Content-Type": "application/json"})
