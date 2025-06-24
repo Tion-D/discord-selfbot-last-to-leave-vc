@@ -126,8 +126,8 @@ async def connect_to_gateway():
                                 "intents": INTENTS,
                                 "properties": {
                                     "$os": "windows",
-                                    "$browser": "custom",
-                                    "$device": "custom",
+                                    "$browser": "Discord Client",
+                                    "$device": "desktop",
                                 },
                                 "presence": {
                                     "status": "online",
@@ -151,15 +151,22 @@ async def connect_to_gateway():
                     if (s := data.get("s")) is not None:
                         seq = s
 
+                    event_type = data.get("t")
+                    if event_type:
+                        print(f"[DEBUG] Received event: {event_type}")
+
                     if (
-                        data.get("t") == "MESSAGE_REACTION_ADD"
+                        event_type == "MESSAGE_REACTION_ADD"
                         and afk_channel_id_global
                     ):
                         d = data["d"]
+                        print(f"[DEBUG] Reaction event: {d}")
+                        
                         if (
                             d["channel_id"] == afk_channel_id_global
                             and d["emoji"]["name"] == "✅"
                         ):
+                            print(f"[DEBUG] Checkmark reaction detected in AFK channel")
                             msg_id = d["message_id"]
                             emoji = "%E2%9C%85"
                             url = (
@@ -167,8 +174,23 @@ async def connect_to_gateway():
                                 f"{afk_channel_id_global}/messages/{msg_id}/"
                                 f"reactions/{emoji}/@me"
                             )
-                            hdrs = {"Authorization": f"Bot {CURRENT_TOKEN}"}
-                            requests.put(url, headers=hdrs, timeout=10)
+                            
+                            hdrs = {"Authorization": CURRENT_TOKEN}
+                            
+                            try:
+                                response = requests.put(url, headers=hdrs, timeout=10)
+                                if response.status_code == 204:
+                                    print(f"[SUCCESS] Added reaction to message {msg_id}")
+                                elif response.status_code == 400:
+                                    print(f"[INFO] Reaction already exists on message {msg_id}")
+                                else:
+                                    print(f"[ERROR] Failed to add reaction: {response.status_code} - {response.text}")
+                            except Exception as e:
+                                print(f"[ERROR] Exception adding reaction: {e}")
+
+                    elif event_type == "READY":
+                        user_info = data["d"]["user"]
+                        print(f"[GW] READY – Logged in as {user_info['username']}#{user_info['discriminator']}")
 
                 hb_task.cancel()
 
@@ -183,9 +205,6 @@ def run_bot():
     asyncio.set_event_loop(bot_loop)
     bot_loop.create_task(connect_to_gateway())
     bot_loop.run_forever()
-
-
-# ──────────────────────────── main ──────────────────────────── #
 
 if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
