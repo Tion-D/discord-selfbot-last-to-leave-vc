@@ -35,7 +35,6 @@ INDEX_HTML = """
 </html>
 """
 
-
 @app.route("/")
 def home() -> str:
     return INDEX_HTML
@@ -155,38 +154,48 @@ async def connect_to_gateway():
                     if event_type:
                         print(f"[DEBUG] Received event: {event_type}")
 
-                    if (
-                        event_type == "MESSAGE_REACTION_ADD"
-                        and afk_channel_id_global
-                    ):
+                    if event_type == "MESSAGE_REACTION_ADD":
                         d = data["d"]
-                        print(f"[DEBUG] Reaction event: {d}")
+                        print(f"[DEBUG] Reaction event data: {d}")
+                        print(f"[DEBUG] AFK Channel ID set to: {afk_channel_id_global}")
+                        print(f"[DEBUG] Event channel ID: {d.get('channel_id')}")
+                        print(f"[DEBUG] Emoji name: {d.get('emoji', {}).get('name')}")
                         
-                        if (
-                            d["channel_id"] == afk_channel_id_global
-                            and d["emoji"]["name"] == "✅"
-                        ):
-                            print(f"[DEBUG] Checkmark reaction detected in AFK channel")
-                            msg_id = d["message_id"]
-                            emoji = "%E2%9C%85"
-                            url = (
-                                "https://discord.com/api/v10/channels/"
-                                f"{afk_channel_id_global}/messages/{msg_id}/"
-                                f"reactions/{emoji}/@me"
-                            )
-                            
-                            hdrs = {"Authorization": CURRENT_TOKEN}
-                            
-                            try:
-                                response = requests.put(url, headers=hdrs, timeout=10)
-                                if response.status_code == 204:
-                                    print(f"[SUCCESS] Added reaction to message {msg_id}")
-                                elif response.status_code == 400:
-                                    print(f"[INFO] Reaction already exists on message {msg_id}")
-                                else:
-                                    print(f"[ERROR] Failed to add reaction: {response.status_code} - {response.text}")
-                            except Exception as e:
-                                print(f"[ERROR] Exception adding reaction: {e}")
+                        if afk_channel_id_global:
+                            if (
+                                d["channel_id"] == afk_channel_id_global
+                                and d["emoji"]["name"] == "✅"
+                            ):
+                                print(f"[DEBUG] ✅ Checkmark reaction detected in AFK channel!")
+                                msg_id = d["message_id"]
+                                emoji = "%E2%9C%85"
+                                url = (
+                                    "https://discord.com/api/v10/channels/"
+                                    f"{afk_channel_id_global}/messages/{msg_id}/"
+                                    f"reactions/{emoji}/@me"
+                                )
+                                
+                                hdrs = {"Authorization": CURRENT_TOKEN}
+                                
+                                try:
+                                    print(f"[DEBUG] Making API call to: {url}")
+                                    response = requests.put(url, headers=hdrs, timeout=10)
+                                    print(f"[DEBUG] API Response: {response.status_code}")
+                                    if response.status_code == 204:
+                                        print(f"[SUCCESS] Added reaction to message {msg_id}")
+                                    elif response.status_code == 400:
+                                        print(f"[INFO] Reaction already exists on message {msg_id}")
+                                    else:
+                                        print(f"[ERROR] Failed to add reaction: {response.status_code} - {response.text}")
+                                except Exception as e:
+                                    print(f"[ERROR] Exception adding reaction: {e}")
+                            else:
+                                if d["channel_id"] != afk_channel_id_global:
+                                    print(f"[DEBUG] Reaction not in AFK channel (got {d['channel_id']}, expected {afk_channel_id_global})")
+                                if d["emoji"]["name"] != "✅":
+                                    print(f"[DEBUG] Not a checkmark emoji (got {d['emoji']['name']})")
+                        else:
+                            print(f"[DEBUG] No AFK channel ID set, ignoring reaction")
 
                     elif event_type == "READY":
                         user_info = data["d"]["user"]
@@ -205,6 +214,7 @@ def run_bot():
     asyncio.set_event_loop(bot_loop)
     bot_loop.create_task(connect_to_gateway())
     bot_loop.run_forever()
+
 
 if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
